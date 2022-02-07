@@ -1,4 +1,10 @@
-# AssettoServer [![Build status](https://github.com/compujuckel/AssettoServer/actions/workflows/dotnet.yml/badge.svg)](https://github.com/compujuckel/AssettoServer/actions/workflows/dotnet.yml) [![Discord](https://discordapp.com/api/guilds/890676433746268231/widget.png?style=shield)](https://discord.gg/uXEXRcSkyz)
+# AssettoServer - NightTimePlugin Fork
+
+This is a Fork of https://github.com/compujuckel/AssettoServer for the sole purpose of adding a NightTimePlugin. 
+The Plugin is pretty simple. It will check if it is 22000 seconds after 12 AM (~ 6:06 AM) and set the time to 12 AM.
+
+To enable it copy the NightTimePlugin folder into the plugins folder and enable it in the extra_cfg.yml like this:
+EnablePlugins: [] -> EnablePlugins: [NightTimePlugin]
 
 ## About
 AssettoServer is a custom game server for Assetto Corsa developed with freeroam in mind. It greatly improves upon the default game server by fixing various security issues and providing new features like AI traffic and dynamic weather.
