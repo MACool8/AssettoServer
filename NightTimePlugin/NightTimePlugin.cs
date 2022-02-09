@@ -11,7 +11,7 @@ public class NightTimePlugin : IAssettoServerPlugin
     ACServer _server;
     public void Initialize(ACServer server)
     {
-        Log.Debug("[NightTimePlugin] NightTime plugin initialized");
+        Log.Debug("[NightTimePlugin] NightTime plugin V0.1 initialized");
         _server = server;
         _ = LoopAsync();
     }

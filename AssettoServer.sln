@@ -21,7 +21,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RaceChallengePlugin", "Race
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GeoIPPlugin", "GeoIPPlugin\GeoIPPlugin.csproj", "{F0F4ECA0-24FA-4913-92CB-B48A0DD129F3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NightTimePlugin", "NightTimePlugin\NightTimePlugin.csproj", "{0E3E42BC-3B2B-4FD2-89BC-3B86F8CAB920}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NightTimePlugin", "NightTimePlugin\NightTimePlugin.csproj", "{0E3E42BC-3B2B-4FD2-89BC-3B86F8CAB920}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LightCommunicationPlugin", "LightCommunicationPlugin\LightCommunicationPlugin.csproj", "{98C5C5D0-60DF-4430-BAA7-508DC1B5692C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -69,6 +71,10 @@ Global
 		{0E3E42BC-3B2B-4FD2-89BC-3B86F8CAB920}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0E3E42BC-3B2B-4FD2-89BC-3B86F8CAB920}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0E3E42BC-3B2B-4FD2-89BC-3B86F8CAB920}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98C5C5D0-60DF-4430-BAA7-508DC1B5692C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98C5C5D0-60DF-4430-BAA7-508DC1B5692C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98C5C5D0-60DF-4430-BAA7-508DC1B5692C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98C5C5D0-60DF-4430-BAA7-508DC1B5692C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
