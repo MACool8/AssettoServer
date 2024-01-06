@@ -6,7 +6,7 @@ It implements the feature to play recordings of players back on the server. Thos
 Besides the playback, it should allow for more customization of the ghost playbacks (e.g. looping, proximity aware respawn, multiple ghosts playing synchronized and more)
 
 The ghost server implementation is accompanied by the GhostManagerPlugin. This Plugin allows you to record, debug and permanently save settings. This Plugin is not mandatory if you have already recorded and set up all your ghosts.
-The documentation for this plugin can be found (here)[https://github.com/MACool8/AssettoServer/blob/master/GhostManagerPlugin/README.md]
+The documentation for this plugin can be found [here](https://github.com/MACool8/AssettoServer/blob/master/GhostManagerPlugin/README.md)
 
 This is a fork of https://github.com/compujuckel/AssettoServer which is a fork of https://github.com/Niewiarowski/AssettoServer.
 
@@ -60,24 +60,24 @@ In-depth Guide: To-do
 
 ## Ghost Management Guide (including recording/configuring/dynamic commands)
 
-(Ghost Management Guide)[https://github.com/MACool8/AssettoServer/blob/master/GhostManagment.md]
+[Ghost Management Guide](https://github.com/MACool8/AssettoServer/blob/master/GhostManagment.md)
 
 ## Demo-Servers
 
 2x Proximity Mode Ghosts for each direction
-(01 Drift Fruitsline with DeathWishGarage cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8091]
-(02 Drift Fruitsline with DeathWishGarage cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8101]
+- [01 Drift Fruitsline with DeathWishGarage cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8091)
+- [02 Drift Fruitsline with DeathWishGarage cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8101)
 
 Proximity Mode Ghost
-(01 Drift Euphoria with WDTS cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8093]
-(02 Drift Euphoria with WDTS cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8103]
+- [01 Drift Euphoria with WDTS cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8093)
+- [02 Drift Euphoria with WDTS cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8103)
 
 2x Looping Mode Ghosts
-(01 Drift Sunrise with WDTS cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8094]
-(02 Drift Sunrise with WDTS cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8104]
+- [01 Drift Sunrise with WDTS cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8094)
+- [02 Drift Sunrise with WDTS cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8104)
 
-10x Proximity Mode Ghosts clustered to one unit
-(Cruise Shuto PTB with Paris Cars)[https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8092]
+10x Proximity Mode Ghosts clustered to one unit, with janky driving
+- [Cruise Shuto PTB with Paris Cars](https://acstuff.ru/s/q:race/online/join?ip=195.90.201.187&httpPort=8092)
 
 ## Performance
 During development I kept performance in mind so that I could run this server on low-end hardware later on.
