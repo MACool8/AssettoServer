@@ -6,7 +6,7 @@ It implements the feature to play recordings of players back on the server. Thos
 Besides the playback, it should allow for more customization of the ghost playbacks (e.g. looping, proximity aware respawn, multiple ghosts playing synchronized and more)
 
 The ghost server implementation is accompanied by the GhostManagerPlugin. This Plugin allows you to record, debug and permanently save settings. This Plugin is not mandatory if you have already recorded and set up all your ghosts.
-The documentation for this plugin can be found (here)[GhostManagerPlugin/README.md]
+The documentation for this plugin can be found (here)[https://github.com/MACool8/AssettoServer/blob/master/GhostManagerPlugin/README.md]
 
 This is a fork of https://github.com/compujuckel/AssettoServer which is a fork of https://github.com/Niewiarowski/AssettoServer.
 
@@ -37,30 +37,30 @@ Quickquide:
 - Replace the Original AI Server executable with the downloaded one.
 - Copy the GhostManagerPlugin into the plugin folder
 - Adapt the following settings:
-**server_cfg.ini:** 
-Use only practice Sessions, 
-SET: `CLIENT_SEND_INTERVAL_HZ=32`
-**extra_cfg.yaml:**
-SET: `EnableAi: true`
-ADD: `EnableGhosts: true`
-SET: `EnablePlugins: [GhostManagerPlugin, ...]`
-SET: `PlayerRadiusMeters: <amount of meters after which the ghosts goes out of proximity, the standard 200 works for most people>`
-**cfg/data_track_params.ini**
-If the track you want to use is not already in there, copy an entry and add your track to this file. If not done a `No track params found for ...`-error will stop your server from starting up. 
-**entry_list.ini:** (add for each car you want to be a ghost, have at least one ghost in your setup)
-ADD: `AI=fixed` (AI=auto is not supported yet and probably crashes if a player joins in as the ghost, admins also can't join as ghosts/bots)
-<optional>If you already have a Ghost file you want to load in (during the server startup) then add this, else just start the server without these settings below and record or dynamically load in ghosts:
-ADD: `GHOST=<ghost file name>`
-If you want to add multiple Ghosts with the same ghost file:
-ADD: `GHOST_OFFSET=<how far should the ghosts start off>`
-If you want to cluster:
-ADD: `GHOST_Cluster=<Clustername>`
+- **server_cfg.ini:** 
+- [ ] Use only practice Sessions, 
+- [ ] SET: `CLIENT_SEND_INTERVAL_HZ=32`
+- **extra_cfg.yaml:**
+- [ ] SET: `EnableAi: true`
+- [ ] ADD: `EnableGhosts: true`
+- [ ] SET: `EnablePlugins: [GhostManagerPlugin, ...]`
+- [ ] SET: `PlayerRadiusMeters: <amount of meters after which the ghosts goes out of proximity, the standard 200 works for most people>`
+- **cfg/data_track_params.ini**
+- [ ] If the track you want to use is not already in there, copy an entry and add your track to this file. If not done a `No track params found for ...`-error will stop your server from starting up. 
+- **entry_list.ini:** (add for each car you want to be a ghost, have at least one ghost in your setup)
+- [ ] ADD: `AI=fixed` (AI=auto is not supported yet and probably crashes if a player joins in as the ghost, admins also can't join as ghosts/bots)
+- <optional>If you already have a Ghost file you want to load in (during the server startup) then add this, else just start the server without these settings below and record or dynamically load in ghosts:
+- [ ] ADD: `GHOST=<ghost file name>`
+- If you want to add multiple Ghosts with the same ghost file:
+- [ ] ADD: `GHOST_OFFSET=<how far should the ghosts start off>`
+- If you want to cluster:
+- [ ] ADD: `GHOST_Cluster=<Clustername>`
 
 In-depth Guide: To-do
 
 ## Ghost Management Guide (including recording/configuring/dynamic commands)
 
-(Ghost Management Guide)[GhostManagment.md]
+(Ghost Management Guide)[https://github.com/MACool8/AssettoServer/blob/master/GhostManagment.md]
 
 ## Demo-Servers
 
