@@ -26,7 +26,7 @@ public partial class EntryCar
     public byte[] LastSeenAiSpawn { get; }
     public byte[] AiPakSequenceIds { get; }
     public AiState?[] LastSeenAiState { get; }
-    public string? AiName { get; private set; }
+    public string? AiName { get; set; }
     public bool AiEnableColorChanges { get; set; } = false;
     public int AiIdleEngineRpm { get; set; } = 800;
     public int AiMaxEngineRpm { get; set; } = 3000;
@@ -49,7 +49,7 @@ public partial class EntryCar
     public int? MaxAiSafetyDistanceMetersSquared { get; set; }
     public List<LaneSpawnBehavior>? AiAllowedLanes { get; set; }
     public float TyreDiameterMeters { get; set; }
-    private readonly List<AiState> _aiStates = new List<AiState>();
+    public readonly List<AiState> _aiStates = new List<AiState>();
     private readonly ReaderWriterLockSlim _aiStatesLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
     
     private readonly Func<EntryCar, AiState> _aiStateFactory;
@@ -337,7 +337,7 @@ public partial class EntryCar
 
                 if (_aiStates.Count == 0)
                 {
-                    Logger.Verbose("Traffic {SessionId} has no states left, disconnecting", SessionId);
+                    Logger.Verbose($"Traffic {SessionId} has no states left, disconnecting");
                     _entryCarManager.BroadcastPacket(new CarDisconnected { SessionId = SessionId });
                 }
 
@@ -417,6 +417,12 @@ public partial class EntryCar
             if (AiMaxOverbooking.HasValue)
             {
                 count = Math.Min(count, AiMaxOverbooking.Value);
+            }
+
+            // Quick and dirty fix to disable overbooking with ghosts
+            if(_configuration.Extra.EnableGhosts)
+            {
+                count = Math.Min(1, count);
             }
 
             if (count > _aiStates.Count)

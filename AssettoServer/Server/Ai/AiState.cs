@@ -10,6 +10,8 @@ using AssettoServer.Shared.Network.Packets.Outgoing;
 using AssettoServer.Utils;
 using JPBotelho;
 using Serilog;
+using GhostState = AssettoServer.Shared.Network.Packets.Incoming.PositionUpdateIn;
+
 
 namespace AssettoServer.Server.Ai;
 
@@ -18,6 +20,7 @@ public class AiState
     public CarStatus Status { get; } = new();
     public bool Initialized { get; private set; }
 
+    public bool FirstUpdate = true;
     public int CurrentSplinePointId
     {
         get => _currentSplinePointId;
@@ -62,12 +65,15 @@ public class AiState
     private float _endIndicatorDistance;
     private float _minObstacleDistance;
 
+    public int LastSequenceID = 0;
+    public int CurrentGhostRecord = 0;
+
     private readonly ACServerConfiguration _configuration;
     private readonly SessionManager _sessionManager;
     private readonly EntryCarManager _entryCarManager;
     private readonly WeatherManager _weatherManager;
     private readonly AiSpline _spline;
-    private readonly EntryCar _entryCar;
+    public readonly EntryCar _entryCar;
     private readonly JunctionEvaluator _junctionEvaluator;
 
     private static readonly List<Color> CarColors = new()
@@ -99,8 +105,23 @@ public class AiState
         _weatherManager = weatherManager;
         _configuration = configuration;
         _entryCarManager = entryCarManager;
-        _spline = spline;
-        _junctionEvaluator = new JunctionEvaluator(spline);
+        if (!configuration.Extra.EnableGhosts)
+        {
+            _spline = spline;
+            _junctionEvaluator = new JunctionEvaluator(spline);
+        }
+
+        _lastTick = _sessionManager.ServerTimeMilliseconds;
+
+    }
+
+    public AiState(EntryCar entryCar, SessionManager sessionManager, WeatherManager weatherManager, ACServerConfiguration configuration, EntryCarManager entryCarManager)
+    {
+        _entryCar = entryCar;
+        _sessionManager = sessionManager;
+        _weatherManager = weatherManager;
+        _configuration = configuration;
+        _entryCarManager = entryCarManager;
 
         _lastTick = _sessionManager.ServerTimeMilliseconds;
     }
@@ -171,6 +192,21 @@ public class AiState
         _endIndicatorDistance = 0;
         _lastTick = _sessionManager.ServerTimeMilliseconds;
         _minObstacleDistance = Random.Shared.Next(8, 13);
+        SpawnCounter++;
+        Initialized = true;
+        Update();
+    }
+
+    public void Teleport(GhostState point)
+    {
+        SetStatusByUpdate(point);
+
+        SafetyDistanceSquared = Random.Shared.Next(_configuration.Extra.AiParams.MinAiSafetyDistanceSquared, _configuration.Extra.AiParams.MaxAiSafetyDistanceSquared);
+        _stoppedForCollisionUntil = 0;
+        _ignoreObstaclesUntil = 0;
+        _obstacleHonkEnd = 0;
+        _obstacleHonkStart = 0;
+        _lastTick = Environment.TickCount64;
         SpawnCounter++;
         Initialized = true;
         Update();
@@ -551,9 +587,17 @@ public class AiState
         SetTargetSpeed(speed, _entryCar.AiDeceleration, _entryCar.AiAcceleration);
     }
 
+    public void TeleportGhostTo(int SequenceNumber)
+    {
+        CurrentGhostRecord = SequenceNumber;
+        LastSequenceID = (_entryCar.GhostLine[CurrentGhostRecord].PakSequenceId - 1 + 256) % 256;
+    }
+
     public void Update()
     {
-        if (!Initialized)
+        if (!_configuration.Extra.EnableGhosts)
+        {
+            if (!Initialized)
             return;
 
         var ops = _spline.Operations;
@@ -616,8 +660,75 @@ public class AiState
                             | GetWiperSpeed(_weatherManager.CurrentWeather.RainIntensity)
                             | _indicator;
         Status.Gear = 2;
+        }
+        else
+        {
+            if (_entryCar.GhostLine == null || _entryCar.GhostLine.Count == 0)
+                return;
+
+            if (CurrentGhostRecord == _entryCar.GhostStart)
+            {
+                LastSequenceID = (_entryCar.GhostLine[CurrentGhostRecord].PakSequenceId - 1 + 256) % 256;
+            }
+
+            // Skip udpating if a update is missing
+            if ((LastSequenceID + 1) % 256 != _entryCar.GhostLine[CurrentGhostRecord].PakSequenceId)
+            {
+                LastSequenceID = (LastSequenceID + 1) % 256;
+                return;
+            }
+
+
+            GhostState curUpdate = _entryCar.GhostLine[CurrentGhostRecord];
+
+
+            SetStatusByUpdate(curUpdate);
+
+            if (_entryCar.GhostHidden)
+            {
+                _entryCar.GhostPlaying = false;
+                // We hide the Ghost under the map
+                Status.Position = new Vector3(0, -1000, 0);
+                Status.NormalizedPosition = 0.0f;
+            }
+            if (!_entryCar.GhostPlaying)
+            {
+                Status.Velocity = new Vector3(0, 0, 0);
+                Status.EngineRpm = 0;
+            }
+            if (_entryCar.GhostPlaying)
+            {
+                CurrentGhostRecord++;
+                LastSequenceID = (LastSequenceID + 1) % 256;
+            }
+
+            if (CurrentGhostRecord >= _entryCar.GhostEnd && _entryCar.GhostPlaying)
+                TeleportGhostTo(_entryCar.GhostLoop);
+        }
     }
-        
+
+    private void SetStatusByUpdate(GhostState curUpdate)
+    {
+        Status.Timestamp = _sessionManager.ServerTimeMilliseconds;
+
+        Status.Position = curUpdate.Position;
+        Status.Rotation = curUpdate.Rotation;
+        Status.Velocity = curUpdate.Velocity;
+        Status.SteerAngle = curUpdate.SteerAngle;
+        Status.WheelAngle = curUpdate.WheelAngle;
+        Status.TyreAngularSpeed[0] = curUpdate.TyreAngularSpeedFL;
+        Status.TyreAngularSpeed[1] = curUpdate.TyreAngularSpeedFR;
+        Status.TyreAngularSpeed[2] = curUpdate.TyreAngularSpeedRL;
+        Status.TyreAngularSpeed[3] = curUpdate.TyreAngularSpeedRR;
+        Status.EngineRpm = curUpdate.EngineRpm;
+        Status.StatusFlag = curUpdate.StatusFlag;
+        Status.Gas = curUpdate.Gas;
+        Status.Gear = curUpdate.Gear;
+        Status.NormalizedPosition = curUpdate.NormalizedPosition;
+        Status.PakSequenceId = curUpdate.PakSequenceId;
+        Status.PerformanceDelta = curUpdate.PerformanceDelta;
+    }
+
     private static float GetTyreAngularSpeed(float speed, float wheelDiameter)
     {
         return speed / (MathF.PI * wheelDiameter) * 6;

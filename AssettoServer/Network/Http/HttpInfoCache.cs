@@ -36,7 +36,7 @@ public class HttpInfoCache : CriticalBackgroundService, IAssettoServerAutostart
         SessionTypes = configuration.Sessions.Select(s => s.Id + 1).ToReadOnlyList();
         ServerName = configuration.Server.Name + (configuration.Extra.EnableServerDetails ? " ℹ" + configuration.Server.HttpPort : "");
         Track = configuration.Server.Track + (string.IsNullOrEmpty(configuration.Server.TrackConfig) ? null : "-" + configuration.Server.TrackConfig);
-        PoweredBy = $"AssettoServer {configuration.ServerVersion}";
+        PoweredBy = $"Modified AssettoServer {configuration.ServerVersion}";
         Assists = new DetailResponseAssists
         {
             AbsState = configuration.Server.ABSAllowed,

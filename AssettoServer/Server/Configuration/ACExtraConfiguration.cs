@@ -98,6 +98,8 @@ public partial class ACExtraConfiguration : ObservableObject
     public List<string>? CorsAllowedOrigins { get; init; }
     
     public AiParams AiParams { get; init; } = new AiParams();
+    [YamlMember(Description = "Enable Ghosts (Ai also need to be activated)")]
+    public bool EnableGhosts { get; set; } = false;
 
     [YamlIgnore] public int MaxAfkTimeMilliseconds => MaxAfkTimeMinutes * 60_000;
     [YamlIgnore] public string Path { get; private set; } = null!;

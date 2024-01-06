@@ -1,0 +1,14 @@
+For Linux:
+
+cd AssettoServer
+dotnet publish .\AssettoServer.csproj --runtime linux-x64 --configuration Release --no-self-contained
+cd ..
+cd GhostManagerPlugin
+dotnet publish .\GhostManagerPlugin.csproj --runtime linux-x64 --configuration Release --no-self-contained
+
+For Windows: 
+cd AssettoServer
+dotnet publish .\AssettoServer.csproj --configuration Release --no-self-contained
+cd ..
+cd GhostManagerPlugin
+dotnet publish .\GhostManagerPlugin.csproj --configuration Release --no-self-contained

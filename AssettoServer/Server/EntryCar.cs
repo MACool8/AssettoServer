@@ -106,8 +106,10 @@ public partial class EntryCar : IEntryCar<ACTcpClient>
             .Enrich.With(new EntryCarLogEventEnricher(this))
             .WriteTo.Logger(Log.Logger)
             .CreateLogger();
-            
+
         AiInit();
+        // Moved to EntryCarManager.Initialize() as it relies on the configuration 
+        //GhostInit();
     }
 
     internal void Reset()

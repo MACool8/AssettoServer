@@ -1,4 +1,5 @@
 ﻿using AssettoServer.Server.Configuration;
+using Serilog;
 
 namespace AssettoServer.Server.OpenSlotFilters;
 

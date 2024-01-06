@@ -170,7 +170,10 @@ public class ACServer : CriticalBackgroundService
     private void MainLoop(CancellationToken stoppingToken)
     {
         int failedUpdateLoops = 0;
-        int sleepMs = 1000 / _configuration.Server.RefreshRateHz;
+        // Hacky way of testing wheather everything works now smooth
+        int sleepMs = _configuration.Server.RefreshRateHz != 32 ? (1000 / _configuration.Server.RefreshRateHz) : 30;
+        if (sleepMs == 30)
+            Log.Debug("[Ghosts] The Updaterate of the Server has been manipulated to 33.3333... Hz");
         long nextTick = _sessionManager.ServerTimeMilliseconds;
         Dictionary<EntryCar, CountedArray<PositionUpdateOut>> positionUpdates = new();
         foreach (var entryCar in _entryCarManager.EntryCars)
@@ -178,7 +181,7 @@ public class ACServer : CriticalBackgroundService
             positionUpdates[entryCar] = new CountedArray<PositionUpdateOut>(_entryCarManager.EntryCars.Length);
         }
 
-        Log.Information("Starting update loop with an update rate of {RefreshRateHz}hz", _configuration.Server.RefreshRateHz);
+        Log.Information("Starting update loop with an update rate of {RefreshRateHz}hz", 1000f/sleepMs);
 
         var updateLoopTimer = Metrics.CreateSummary("assettoserver_acserver_updateasync", "ACServer.UpdateAsync Duration", MetricDefaults.DefaultQuantiles);
 

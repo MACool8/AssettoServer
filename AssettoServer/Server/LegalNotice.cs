@@ -6,10 +6,10 @@
  */
 public static class LegalNotice
 {
-    public const string WelcomeMessage = "\n_____\nPowered by AssettoServer https://assettoserver.org\nType /legal for more details.";
+    public const string WelcomeMessage = "\n_____\nPowered by the ghost version of the AssettoServer\n Source: https://assettoserver.org\nGhost Version(soon available here): https://github.com/MACool8/AssettoServer \nType /legal for more details.";
 
     public const string LegalNoticeText =
-@"| Copyright (C) 2023  Niewiarowski, compujuckel
+@"| Copyright (C) 2024  Niewiarowski, compujuckel, MACool8 aka CMD
 | 
 | This program is free software: you can redistribute it and/or modify
 | it under the terms of the GNU Affero General Public License as

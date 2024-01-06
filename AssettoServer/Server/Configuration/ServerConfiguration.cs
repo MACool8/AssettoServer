@@ -16,7 +16,8 @@ public class ServerConfiguration
     [IniField("SERVER", "UDP_PORT")] public ushort UdpPort { get; init; } = 9600;
     [IniField("SERVER", "TCP_PORT")] public ushort TcpPort { get; init; } = 9600;
     [IniField("SERVER", "HTTP_PORT")] public ushort HttpPort { get; init; } = 8081;
-    [IniField("SERVER", "CLIENT_SEND_INTERVAL_HZ")] public byte RefreshRateHz { get; init; } = 20;
+    [IniField("SERVER", "NEW_CLIENT_SEND_INTERVAL_HZ_DONT_USE_IT_FOR_GHOSTS")] public byte RefreshRateHz { get; init; } = 32;
+    [IniField("SERVER", "CLIENT_SEND_INTERVAL_HZ")] public byte ReconfiguredAndUnused_RefreshRateHz { get; init; } = 20;
     [IniField("SERVER", "TRACK")] public string Track { get; init; } = "";
     [IniField("SERVER", "CONFIG_TRACK")] public string TrackConfig { get; init; } = "";
     [IniField("SERVER", "SUN_ANGLE")] public float SunAngle { get; init; }

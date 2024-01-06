@@ -23,6 +23,9 @@ public class EntryList
         [IniField("TEAM")] public string? Team { get; init; }
         [IniField("GUID")] public string Guid { get; init; } = "";
         [IniField("AI")] public AiMode AiMode { get; init; } = AiMode.None;
+        [IniField("GHOST")] public string GhostFile { get; init; } = "";
+        [IniField("GHOST_OFFSET")] public int GhostOffset { get; init; } = 0;
+        [IniField("GHOST_CLUSTER")] public string GhostCluster { get; init; } = "";
     }
     
     public static EntryList FromFile(string path)

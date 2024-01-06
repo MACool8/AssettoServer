@@ -16,6 +16,12 @@ using AssettoServer.Utils;
 using Microsoft.Extensions.Hosting;
 using Prometheus;
 using Serilog;
+using AssettoServer.Shared.Network.Packets.Incoming;
+using GhostState = AssettoServer.Shared.Network.Packets.Incoming.PositionUpdateIn;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Mvc.TagHelpers.Cache;
+using AssettoServer.Shared.Model;
+using System.Runtime.ConstrainedExecution;
 
 namespace AssettoServer.Server.Ai;
 
@@ -45,8 +51,42 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
         _sessionManager = sessionManager;
         _configuration = configuration;
         _entryCarManager = entryCarManager;
-        _spline = spline;
-        _junctionEvaluator = new JunctionEvaluator(spline, false);
+        if (!_configuration.Extra.EnableGhosts)
+        {
+            _spline = spline;
+            _junctionEvaluator = new JunctionEvaluator(spline, false);
+        }
+        //_entryCarFactory = entryCarFactory;
+
+        if (_configuration.Extra.AiParams.Debug)
+        {
+            using var streamReader = new StreamReader(Assembly.GetExecutingAssembly().GetManifestResourceStream("AssettoServer.Server.Ai.ai_debug.lua")!);
+            serverScriptProvider.AddScript(streamReader.ReadToEnd(), "ai_debug.lua");
+        }
+
+        _updateDurationTimer = Metrics.CreateSummary("assettoserver_aibehavior_update", "AiBehavior.Update Duration", MetricDefaults.DefaultQuantiles);
+        _obstacleDetectionDurationTimer = Metrics.CreateSummary("assettoserver_aibehavior_obstacledetection", "AiBehavior.ObstacleDetection Duration", MetricDefaults.DefaultQuantiles);
+
+        _entryCarManager.ClientConnected += (client, _) =>
+        {
+            client.ChecksumPassed += OnClientChecksumPassed;
+            client.Collision += OnCollision;
+        };
+
+        _entryCarManager.ClientDisconnected += OnClientDisconnected;
+        _configuration.Extra.AiParams.PropertyChanged += (_, _) => AdjustOverbooking();
+    }
+
+    public AiBehavior(SessionManager sessionManager,
+        ACServerConfiguration configuration,
+        EntryCarManager entryCarManager,
+        IHostApplicationLifetime applicationLifetime,
+        //EntryCar.Factory entryCarFactory,
+        CSPServerScriptProvider serverScriptProvider) : base(applicationLifetime)
+    {
+        _sessionManager = sessionManager;
+        _configuration = configuration;
+        _entryCarManager = entryCarManager;
         //_entryCarFactory = entryCarFactory;
 
         if (_configuration.Extra.AiParams.Debug)
@@ -80,7 +120,7 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
         }
     }
 
-    private void OnClientChecksumPassed(ACTcpClient sender, EventArgs args)
+      private void OnClientChecksumPassed(ACTcpClient sender, EventArgs args)
     {
         sender.EntryCar.SetAiControl(false);
         AdjustOverbooking();
@@ -191,7 +231,9 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
             }
             else if (entryCar.AiControlled)
             {
-                entryCar.RemoveUnsafeStates();
+                if(!_configuration.Extra.EnableGhosts)
+                    entryCar.RemoveUnsafeStates();
+
                 entryCar.GetInitializedStates(_initializedAiStates, _uninitializedAiStates);
             }
         }
@@ -214,6 +256,7 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
         {
             for (int j = 0; j < _playerCars.Count; j++)
             {
+
                 if (_playerOffsetPositions.Count <= j)
                 {
                     var offsetPosition = _playerCars[j].Status.Position;
@@ -245,7 +288,7 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
         foreach (var dist in _aiMinDistanceToPlayer)
         {
             if (dist.Value > _configuration.Extra.AiParams.PlayerRadiusSquared
-                && _sessionManager.ServerTimeMilliseconds > dist.Key.SpawnProtectionEnds)
+                            && _sessionManager.ServerTimeMilliseconds > dist.Key.SpawnProtectionEnds)
             {
                 _uninitializedAiStates.Add(dist.Key);
             }
@@ -264,30 +307,234 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
 
         while (_playerCars.Count > 0 && _uninitializedAiStates.Count > 0)
         {
-            int spawnPointId = -1;
-            while (spawnPointId < 0 && _playerCars.Count > 0)
+            if (!_configuration.Extra.EnableGhosts)
             {
-                var targetPlayerCar = _playerCars.ElementAt(GetRandomWeighted(_playerCars.Count));
-                _playerCars.Remove(targetPlayerCar);
+                int spawnPointId = -1;
+                while (spawnPointId < 0 && _playerCars.Count > 0)
+                {
+                    var targetPlayerCar = _playerCars.ElementAt(GetRandomWeighted(_playerCars.Count));
+                    _playerCars.Remove(targetPlayerCar);
 
-                spawnPointId = GetSpawnPoint(targetPlayerCar);
-            }
+                    spawnPointId = GetSpawnPoint(targetPlayerCar);
+                }
 
-            if (spawnPointId < 0 || !_junctionEvaluator.TryNext(spawnPointId, out _))
-                continue;
-
-            foreach (var targetAiState in _uninitializedAiStates)
-            {
-                if (!targetAiState.CanSpawn(spawnPointId))
+                if (spawnPointId < 0 || !_junctionEvaluator.TryNext(spawnPointId, out _))
                     continue;
 
-                targetAiState.Teleport(spawnPointId);
+                foreach (var targetAiState in _uninitializedAiStates)
+                {
+                    if (!targetAiState.CanSpawn(spawnPointId))
+                        continue;
 
-                _uninitializedAiStates.Remove(targetAiState);
-                break;
+                    targetAiState.Teleport(spawnPointId);
+
+                    _uninitializedAiStates.Remove(targetAiState);
+                    break;
+                }
+
+            }
+            // Instead of placing the ai near the player, this piece of code will make sure once a Ghost
+            // (or rather the whole cluster of Ghosts)
+            // gets too far away from a player, that he will restart at the start position.
+            // This needs to be done atleast once for each ghost, when the server starts up (=FirstUpdate flag).
+            else
+            {
+                _playerCars.Clear();
+                foreach (AiState targetAiState in _uninitializedAiStates)
+                {
+                    if (targetAiState == null) 
+                        continue;
+
+                    if (targetAiState.FirstUpdate)
+                    {
+                        foreach (AiState state in targetAiState._entryCar._aiStates)
+                        {
+                            if (state._entryCar.GhostLine != null && state._entryCar.GhostLine.Count > 0)
+                            {
+                                int Range = state._entryCar.GhostEnd - state._entryCar.GhostStart;
+                                GhostState Spawnpoint = state._entryCar.GhostLine[state._entryCar.GhostStart + (state._entryCar.GhostOffset % Range)];
+                                state.SpawnProtectionEnds = _sessionManager.ServerTimeMilliseconds + Random.Shared.Next(_configuration.Extra.AiParams.MinSpawnProtectionTimeMilliseconds, _configuration.Extra.AiParams.MaxSpawnProtectionTimeMilliseconds);
+                                state.FirstUpdate = false;
+                                state.Teleport(Spawnpoint);
+                                state.TeleportGhostTo(state._entryCar.GhostStart + (state._entryCar.GhostOffset % Range));
+                            }
+                        }                       
+                    }
+                }
+
+                Dictionary<string, List<AiState>> Cache = BuildClusterGroupedAiStateCache(_uninitializedAiStates);
+                foreach (string Cluster in Cache.Keys)
+                {
+                    List<AiState> unininitialitedStatesInCluster = Cache.GetValueOrDefault(Cluster, null);
+                    if (unininitialitedStatesInCluster == null)
+                    {
+                        Log.Error($"[Ghost]Internal Error: Couldn't find Cluster '{Cluster}' in Cache");
+                        continue;
+                    }
+
+                    if(CheckIfWholeClusterNeedsTP(Cluster, unininitialitedStatesInCluster))
+                    {
+                        foreach(AiState state in unininitialitedStatesInCluster)
+                        {
+                            if (state._entryCar.GhostLine == null || state._entryCar.GhostLine.Count == 0)
+                                continue;
+                            
+                            int Range = state._entryCar.GhostEnd - state._entryCar.GhostStart;
+                            state.SpawnProtectionEnds = _sessionManager.ServerTimeMilliseconds + Random.Shared.Next(_configuration.Extra.AiParams.MinSpawnProtectionTimeMilliseconds, _configuration.Extra.AiParams.MaxSpawnProtectionTimeMilliseconds);
+                            state.TeleportGhostTo(state._entryCar.GhostStart + (state._entryCar.GhostOffset%Range));
+
+                        }
+                    }
+                }
+
+                CachedClusterChecks.Clear();
+                _uninitializedAiStates.Clear();
+                /*_playerCars.Clear();
+                foreach (AiState targetAiState in _uninitializedAiStates)
+                {
+                    if (targetAiState == null) continue;
+
+                    if ((!targetAiState._entryCar.GhostLoopMode || targetAiState.FirstUpdate) && targetAiState._entryCar.GhostLine != null)
+                    {
+                        // To overcome overbooking errors currently all aistates get set
+                        // This might need to get reworked for more features or/and less overhead
+
+                        if (CheckIfWholeClusterNeedsTP(targetAiState._entryCar, _uninitializedAiStates) || targetAiState.FirstUpdate)
+                        {
+
+                            foreach (AiState state in targetAiState._entryCar._aiStates)
+                            {
+                                int Range = state._entryCar.GhostEnd - state._entryCar.GhostStart;
+                                GhostState Spawnpoint = state._entryCar.GhostLine[(state._entryCar.GhostStart + state._entryCar.GhostOffset) % Range];
+                                state.SpawnProtectionEnds = _sessionManager.ServerTimeMilliseconds + Random.Shared.Next(_configuration.Extra.AiParams.MinSpawnProtectionTimeMilliseconds, _configuration.Extra.AiParams.MaxSpawnProtectionTimeMilliseconds);
+                                state.FirstUpdate = false;
+                                state.CurrentGhostRecord = state._entryCar.GhostStart + state._entryCar.GhostOffset;
+                                state.Teleport(Spawnpoint);
+                                _uninitializedAiStates.Remove(state);
+                            }
+                            // Also tp all the other cars 
+                            List<EntryCar> VehiclesInSameCluster;
+                            if(GhostsGroupedByCluster.TryGetValue(targetAiState._entryCar.GhostCluster, out VehiclesInSameCluster))
+                            {
+                                foreach (EntryCar vehicle in VehiclesInSameCluster)
+                                {
+                                    foreach (AiState state in vehicle._aiStates)
+                                    {
+                                        int Range = state._entryCar.GhostEnd - state._entryCar.GhostStart;
+                                        GhostState Spawnpoint = state._entryCar.GhostLine[(state._entryCar.GhostStart + state._entryCar.GhostOffset) % Range];
+                                        state.SpawnProtectionEnds = _sessionManager.ServerTimeMilliseconds + Random.Shared.Next(_configuration.Extra.AiParams.MinSpawnProtectionTimeMilliseconds, _configuration.Extra.AiParams.MaxSpawnProtectionTimeMilliseconds);
+                                        state.FirstUpdate = false;
+                                        state.CurrentGhostRecord = (state._entryCar.GhostStart + state._entryCar.GhostOffset)%Range;
+                                        state.Teleport(Spawnpoint);
+                                        state.TeleportGhostTo(state.CurrentGhostRecord);
+                                        //_uninitializedAiStates.Remove(state);
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                CachedClusterChecks.Clear();
+                _uninitializedAiStates.Clear();*/
             }
         }
     }
+
+    public static Dictionary<string, List<EntryCar>> GhostsGroupedByCluster = new Dictionary<string, List<EntryCar>>();
+    public static Dictionary<string,bool> CachedClusterChecks = new Dictionary<string, bool>();
+
+    private Dictionary<string, List<AiState>> BuildClusterGroupedAiStateCache(List<AiState> GivenAiStates)
+    {
+        Dictionary<string, List<AiState>> AiStatesGroupedByCluster = new Dictionary<string, List<AiState>>();
+
+        foreach(AiState state in GivenAiStates)
+        {
+            if(state == null || state._entryCar.GhostLoopMode)
+                continue;
+
+            string ClusterName = state._entryCar.GhostCluster == "" ? $"~{state._entryCar.SessionId}" : state._entryCar.GhostCluster;
+
+            if (!AiStatesGroupedByCluster.ContainsKey(ClusterName))
+            {
+                List<AiState> newCluster = new List<AiState>();
+                newCluster.Add(state);
+                AiStatesGroupedByCluster.Add(ClusterName, newCluster);
+            }
+            else
+            {
+                List<AiState> ExistingCluster;
+                AiStatesGroupedByCluster.TryGetValue(ClusterName, out ExistingCluster);
+                ExistingCluster.Add(state);
+            }
+        }
+        return AiStatesGroupedByCluster;
+    }
+    private void BuildClusterGroupedEntryCarCache()
+    {
+
+        GhostsGroupedByCluster.Clear();
+        foreach (EntryCar car in _entryCarManager.EntryCars)
+        {
+            List<EntryCar> FoundCluster;
+            string ClusterName = car.GhostCluster == "" ? $"~{car.SessionId}" : car.GhostCluster;
+            if (!GhostsGroupedByCluster.TryGetValue(ClusterName, out FoundCluster))
+            {
+                FoundCluster = new List<EntryCar>();                
+                GhostsGroupedByCluster.Add(ClusterName, FoundCluster);
+            }
+            FoundCluster.Add(car);
+        }
+
+    }
+
+    private bool CheckIfWholeClusterNeedsTP(string GhostCluster, List<AiState> _uninitializedAiStates)
+    {
+        // Cars without cluster always TP on their own
+        if (GhostCluster == "")
+            return true;
+
+        // CachedResult should help with servers and a lot of cars
+        bool CachedResult;
+        if(CachedClusterChecks.TryGetValue(GhostCluster, out CachedResult))
+            return CachedResult;
+
+        // Create Cluster oriented Disctionary Cache
+        if(GhostsGroupedByCluster.Count == 0)
+            BuildClusterGroupedEntryCarCache();
+
+        // Get only the Vehicles for this cluster
+        List<EntryCar> VehicleInSameCluster = null;
+        if(!GhostsGroupedByCluster.TryGetValue(GhostCluster, out VehicleInSameCluster))
+        {
+            Log.Error($"[Ghosts] Internall Error, when searching for the Cluster '{GhostCluster}': Not Found");
+            return false;
+        }
+        // Check if all vehicles in cluster need TP
+        bool ShouldTP = true;
+        foreach (EntryCar car in VehicleInSameCluster)
+        {
+            if (car.GhostLoopMode)
+                continue;
+
+            bool should_continue = false;
+            foreach(AiState state in _uninitializedAiStates)  
+            {
+                if (state._entryCar.SessionId == car.SessionId)
+                {
+                    should_continue = true;
+                    break;
+                }
+            }
+            if (should_continue)
+                continue;
+
+            ShouldTP = false;
+        }
+        CachedClusterChecks.Add(GhostCluster, ShouldTP);
+        return ShouldTP;
+    }
+
 
     private async Task UpdateAsync(CancellationToken stoppingToken)
     {
@@ -416,7 +663,7 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
         int rest = targetAiCount % aiSlots.Count;
             
         Log.Debug("AI Slot overbooking update - No. players: {NumPlayers} - No. AI Slots: {NumAiSlots} - Target AI count: {TargetAiCount} - Overbooking: {Overbooking} - Rest: {Rest}", 
-            playerCount, aiSlots.Count, targetAiCount, overbooking, rest);
+            playerCount, aiSlots.Count, targetAiCount, !_configuration.Extra.EnableGhosts ? overbooking : 1, rest);
 
         for (int i = 0; i < aiSlots.Count; i++)
         {
@@ -427,7 +674,8 @@ public class AiBehavior : CriticalBackgroundService, IAssettoServerAutostart
     protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _ = UpdateAsync(stoppingToken);
-        _ = ObstacleDetectionAsync(stoppingToken);
+        if (!_configuration.Extra.EnableGhosts)
+            _ = ObstacleDetectionAsync(stoppingToken);
 
         return Task.CompletedTask;
     }

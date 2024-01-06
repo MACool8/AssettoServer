@@ -96,6 +96,7 @@ public class HttpController : ControllerBase
         guid = guid.Substring(1);
         bool guidValid = ulong.TryParse(guid, out ulong ulongGuid);
         bool isAdmin = guidValid && await _adminService.IsAdminAsync(ulongGuid);
+        bool isAdminAllowed = isAdmin && !_configuration.Extra.EnableGhosts;
 
         EntryListResponse responseObj = new EntryListResponse
         {
@@ -103,7 +104,7 @@ public class HttpController : ControllerBase
             {
                 Model = ec.Model,
                 Skin = ec.Skin,
-                IsEntryList = isAdmin || _openSlotFilter.IsSlotOpen(ec, ulongGuid),
+                IsEntryList = isAdminAllowed || _openSlotFilter.IsSlotOpen(ec, ulongGuid),
                 DriverName = ec.Client?.Name,
                 DriverTeam = ec.Client?.Team,
                 IsConnected = ec.Client != null
@@ -120,7 +121,8 @@ public class HttpController : ControllerBase
     {
         bool guidValid = ulong.TryParse(guid, out ulong ulongGuid);
         bool isAdmin = guidValid && await _adminService.IsAdminAsync(ulongGuid);
-        
+        bool isAdminAllowed = isAdmin && !_configuration.Extra.EnableGhosts;
+
         DetailResponse responseObj = new DetailResponse
         {
             Cars = _cache.Cars,
@@ -152,7 +154,7 @@ public class HttpController : ControllerBase
                 {
                     Model = ec.Model,
                     Skin = ec.Skin,
-                    IsEntryList = isAdmin || _openSlotFilter.IsSlotOpen(ec, ulongGuid),
+                    IsEntryList = isAdminAllowed || _openSlotFilter.IsSlotOpen(ec, ulongGuid),
                     DriverName = ec.Client?.Name,
                     DriverTeam = ec.Client?.Team,
                     DriverNation = ec.Client?.NationCode,

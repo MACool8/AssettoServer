@@ -2,8 +2,16 @@
 using AssettoServer.Server.Configuration;
 using AssettoServer.Server.OpenSlotFilters;
 using AssettoServer.Server.Plugin;
+using AssettoServer.Shared.Model;
+using AssettoServer.Shared.Network.Packets;
 using Autofac;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
+using Serilog;
+using System.Collections.Generic;
+using System;
+using GhostState = AssettoServer.Shared.Network.Packets.Incoming.PositionUpdateIn;
+using System.IO;
 
 namespace AssettoServer.Server.Ai;
 
@@ -20,7 +28,7 @@ public class AiModule : Module
     {
         builder.RegisterType<AiState>().AsSelf();
 
-        if (_configuration.Extra.EnableAi)
+        if (_configuration.Extra.EnableAi && !_configuration.Extra.EnableGhosts)
         {
             builder.RegisterType<AiBehavior>().AsSelf().As<IAssettoServerAutostart>().SingleInstance();
             builder.RegisterType<AiUpdater>().AsSelf().SingleInstance().AutoActivate();
@@ -35,6 +43,12 @@ public class AiModule : Module
             builder.RegisterType<FastLaneParser>().AsSelf();
             builder.RegisterType<AiSplineLocator>().AsSelf();
             builder.Register((AiSplineLocator locator) => locator.Locate()).AsSelf().SingleInstance();
+        }
+        else if (_configuration.Extra.EnableAi && _configuration.Extra.EnableGhosts)
+        {
+            builder.RegisterType<AiBehavior>().AsSelf().As<IAssettoServerAutostart>().SingleInstance();
+            builder.RegisterType<AiUpdater>().AsSelf().SingleInstance().AutoActivate();
+            builder.RegisterType<AiSlotFilter>().As<IOpenSlotFilter>();
         }
     }
 }

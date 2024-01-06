@@ -184,10 +184,11 @@ public class EntryCarManager
                 EntryCar entryCar = EntryCars[i];
 
                 bool isAdmin = await _adminService.IsAdminAsync(handshakeRequest.Guid);
+                bool isAdminAllowd = isAdmin && !_configuration.Extra.EnableGhosts;
 
                 if (entryCar.Client == null
                     && handshakeRequest.RequestedCar == entryCar.Model
-                    && (isAdmin || _openSlotFilterChain.Value.IsSlotOpen(entryCar, handshakeRequest.Guid)))
+                    && (isAdminAllowd || _openSlotFilterChain.Value.IsSlotOpen(entryCar, handshakeRequest.Guid)))
                 {
                     entryCar.Reset();
                     entryCar.Client = client;
@@ -220,6 +221,7 @@ public class EntryCarManager
     {
         EntryCars = new EntryCar[Math.Min(_configuration.Server.MaxClients, _configuration.EntryList.Cars.Count)];
         Log.Information("Loaded {Count} cars", EntryCars.Length);
+        EntryCar smallestGhostOffset = null;
         for (int i = 0; i < EntryCars.Length; i++)
         {
             var entry = _configuration.EntryList.Cars[i];
@@ -234,12 +236,17 @@ public class EntryCarManager
             EntryCars[i].AiMode = aiMode;
             EntryCars[i].AiEnableColorChanges = driverOptions.HasFlag(DriverOptionsFlags.AllowColorChange);
             EntryCars[i].AiControlled = aiMode != AiMode.None;
+            EntryCars[i].ReadInGhostFile = entry.GhostFile;
+            EntryCars[i].GhostOffset = entry.GhostOffset;
+            EntryCars[i].GhostCluster = entry.GhostCluster;
             EntryCars[i].NetworkDistanceSquared = MathF.Pow(_configuration.Extra.NetworkBubbleDistance, 2);
             EntryCars[i].OutsideNetworkBubbleUpdateRateMs = 1000 / _configuration.Extra.OutsideNetworkBubbleRefreshRateHz;
             if (!string.IsNullOrWhiteSpace(entry.Guid))
             {
                 EntryCars[i].AllowedGuids = entry.Guid.Split(';').Select(ulong.Parse).ToList();
             }
+            EntryCars[i].GhostInit();
         }
+
     }
 }
