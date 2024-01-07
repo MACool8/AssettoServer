@@ -38,6 +38,8 @@ Before starting to record, plan how you want your ghost to behave.
 
 3. **Proximity Mode Preparation:** If planning to run a ghost in proximity mode, choose a starting position near the player pits. However, ensure that the starting position is outside of pits to avoid unintended collisions if the "no-contact pits" option is not enabled on the track.
 
+4. **Ping/Packetloss to the Server:** The recordings are just recording your incoming messages. If the server doesn't get your message, it can not record it. Try to use servers which are close to you or even better let the server run on the pc you are playing. The implmentation has it's way of dealing with lost packages, but it can only do so much.
+
 ## Step 3: Stopping the Recording
 
 To stop the recording for the player and save a ghost and meta file, use the command:
