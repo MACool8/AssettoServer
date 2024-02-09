@@ -100,3 +100,30 @@ Sets the cluster of a ghost. Ghosts in the same cluster will only tp back to the
 `/gh_sync`
 
 Respawns all ghosts at their start sequence number (+ offset if used) and by this resets all positions. Useful for ghosts that are clustered or have offsets
+
+`gh_toggleAdminRequirements`
+
+Toggles whether or not Requirement that every ghost command requires admin privileages gets enforced. 
+After disabling the enforcment thís command can be called by non-admins and than only can be turned back on by an real admin.
+This will only be applied during one session and there is no option to enable this with the server start up.
+
+`gh_toggleQuickCommands`
+
+Toggles whether or not Quick commands can be used from admins (or from anyone while admin requirements are disabled).
+Quick Commands are actions in game for Starting/Stopping Recordings, selecting a Ghost file to load in and loading it in to the first ghost.
+Quick Commands explained:
+
+Hazard Lights:
+
+Turn on Hazard Lights to start recording and turn them off to stop recording. (Will also stop the recording automaticly if you tp back to pit)
+
+Left and Right Indicators:
+
+By flashing the left and right indicators you can go back or forward the selected Ghost files (default is the last recorded one, selection resets after recording a new ghost or loading in a ghost)
+
+Horn:
+
+By pressing the Horn for 3 seconds you will load in the selected Ghost (default is the last recorded one by you)  
+
+Flashing Lights 3x:
+Hide your ghost/bot

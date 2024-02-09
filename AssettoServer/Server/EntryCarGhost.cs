@@ -350,7 +350,7 @@ public partial class EntryCar
 
         string MetaFullFileName = FullFileName.Replace(".ghost", ".meta");
 
-        string MetaData = SourceMetaData(BotName, 0, 0, RecordSize, false);
+        string MetaData = SourceMetaData(BotName, 0, 0, RecordSize, true);
 
         SaveCurrentRecordingMetaData(MetaFullFileName, MetaData);
     }

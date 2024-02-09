@@ -688,7 +688,7 @@ public class AiState
             {
                 _entryCar.GhostPlaying = false;
                 // We hide the Ghost under the map
-                Status.Position = new Vector3(0, -1000, 0);
+                Status.Position = new Vector3(0, -100000, 0);
                 Status.NormalizedPosition = 0.0f;
             }
             if (!_entryCar.GhostPlaying)

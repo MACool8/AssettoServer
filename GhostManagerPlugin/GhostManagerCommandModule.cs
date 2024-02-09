@@ -6,6 +6,7 @@ using AssettoServer.Shared.Model;
 using AssettoServer.Shared.Network.Packets.Outgoing;
 using Grpc.Core;
 using Microsoft.Extensions.Configuration;
+using Polly;
 using Qmmands;
 using Serilog;
 using System.IO;
@@ -19,52 +20,13 @@ namespace GhostManagerPlugin
 {
     public class GhostManagerCommandModule : ACModuleBase
     {
-        /*
-        [Command("gh_tpme")]
-        public void gh_tpme(int GhostSessionID, int Position)
-        {
-            EntryCar target = FindGhost(GhostSessionID);
-            if (target == null)
-                return;
-
-            if(Position < target.GhostStart || Position > target.GhostEnd)
-            {
-                Reply($"Given Position ({Position}) out of Range ({target.GhostStart}:{target.GhostEnd})");
-            }
-
-            GhostState UpdateTo = target.GhostLine[Position];
-
-
-
-
-            PositionUpdateOut positionUpdateOut = new PositionUpdateOut(Context.Client.SessionId,
-        Context.Client.EntryCar.Status.PakSequenceId,
-        (uint)(Context.Client.EntryCar.Status.Timestamp - Context.Client.EntryCar.TimeOffset),
-        Context.Client.EntryCar.Ping,
-        UpdateTo.Position,
-        UpdateTo.Rotation,
-        UpdateTo.Velocity,
-        UpdateTo.TyreAngularSpeedFL,
-        UpdateTo.TyreAngularSpeedFR,
-        UpdateTo.TyreAngularSpeedRL,
-        UpdateTo.TyreAngularSpeedRR,
-        UpdateTo.SteerAngle,
-        UpdateTo.WheelAngle,
-        UpdateTo.EngineRpm,
-        UpdateTo.Gear,
-        UpdateTo.StatusFlag,
-        UpdateTo.PerformanceDelta,
-        UpdateTo.Gas);
-
-            Context.Client.SendPacket(positionUpdateOut);
-            Reply($"You just got TPed ... or probably not ...\n");
-        }*/
+        //private bool GhostManagerPlugin.AdminRequired = true;
 
         [Command("gh_identify")]
         public void IdentifyGhosts()
         {
             int GhostsAvailable = 0;
-            
+
             foreach (EntryCar x in GhostManagerPlugin._entryCarManager.EntryCars)
             {
                 if (x.AiControlled)
@@ -73,12 +35,12 @@ namespace GhostManagerPlugin
                     GhostsAvailable++;
                 }
             }
-            Reply($"{GhostsAvailable} Ghosts are available:\n");        }
+            Reply($"{GhostsAvailable} Ghosts are available:\n"); }
 
         [Command("gh_rec")]
         public void StartRecord(string PartialPlayerName)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -96,20 +58,20 @@ namespace GhostManagerPlugin
                 return;
             }
 
-            target.StartRecording();
-
+            _StartRecord(target, Context.Client.Name);
             Reply($"Started recording {target.Client.Name}");
+        }
 
-            Log.Debug($"[GhostManagerPlugin] {Context.Client.Name} started recording {target.Client.Name}.");
-
-
-
+        public static void _StartRecord(EntryCar target, string PersonStartingTheRecording)
+        {
+            target.StartRecording();   
+            Log.Debug($"[GhostManagerPlugin] {PersonStartingTheRecording} started recording {target.Client.Name}.");
         }
 
         [Command("gh_stoprec")]
         public void StopRecord(string PartialPlayerName)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -121,13 +83,22 @@ namespace GhostManagerPlugin
             if (target == null)
                 return;
 
-
             if (!target.RecordingStarted)
             {
                 Reply("You can not stop something, you haven't started. Especialy not a Ghost recording!");
                 Log.Debug($"[GhostManagerPlugin] {Context.Client.Name} tried to stop a recording which wasn't even started.");
                 return;
             }
+
+            string FileName = _StopRecord(target, Context.Client.Name);
+
+            Reply($"Stopped recording and saved file to {Path.Join(GhostManagerPlugin.GhostBasePath, FileName)}");
+        }
+
+        // Returns the file name of the ghost
+        public static string _StopRecord(EntryCar target, string PersonStoppingTheRecording)
+        {
+            Log.Information($"[GhostManagerPlugin] {PersonStoppingTheRecording} is stopping the recording for {target.Client.Name}");
 
             string SaveUserName = MakeValidFileName(target.Client.Name);
 
@@ -161,17 +132,18 @@ namespace GhostManagerPlugin
             string FileName = SaveUserName + "-" + Maximum.ToString("000") + "-" + TrackName + ".ghost";
 
             target.StopRecordingAndSave(Path.Join(GhostManagerPlugin.GhostBasePath, FileName), target.Client.Name);
-            
-            long RecordCount = new System.IO.FileInfo(Path.Join(GhostManagerPlugin.GhostBasePath, FileName)).Length / 61;
 
-            Reply($"Stopped recording and saved file to {Path.Join(GhostManagerPlugin.GhostBasePath, FileName)}");
-            Log.Information($"[GhostManagerPlugin] '{Context.Client.Name}' stopped a recording for '{target.Client.Name}' with the length of {RecordCount} Records. Saved File: {Path.Join(GhostManagerPlugin.GhostBasePath, FileName)}");
+            long RecordCount = new FileInfo(Path.Join(GhostManagerPlugin.GhostBasePath, FileName)).Length / 61;
+
+            Log.Information($"[GhostManagerPlugin] '{PersonStoppingTheRecording}' successfully stopped a recording for '{target.Client.Name}' with the length of {RecordCount} Records. Saved File: {Path.Join(GhostManagerPlugin.GhostBasePath, FileName)}");
+
+            return Path.Join(GhostManagerPlugin.GhostBasePath, FileName);
         }
 
         [Command("gh_savemeta")]
         public void GhostSaveMeta(int GhostSessionID)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -191,7 +163,7 @@ namespace GhostManagerPlugin
         [Command("gh_debug")]
         public void Ghostdebugging(int GhostSessionID, string Type)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -254,7 +226,7 @@ namespace GhostManagerPlugin
         [Command("gh_load")]
         public void GhostLoading(int GhostSessionID, string PartialFileName)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -265,7 +237,7 @@ namespace GhostManagerPlugin
             if (target == null)
                 return;
 
-            List<string> FilesFittingToDiscreption = new List<string>();
+            List<string> FilesFittingToDescription = new List<string>();
 
             foreach (string File in Directory.EnumerateFiles(GhostManagerPlugin.GhostBasePath))
             {
@@ -275,48 +247,50 @@ namespace GhostManagerPlugin
                 if (!File.Contains(PartialFileName))
                     continue;
 
-                FilesFittingToDiscreption.Add(File);
+                FilesFittingToDescription.Add(File);
 
             }
 
-            if (FilesFittingToDiscreption.Count == 0)
+            if (FilesFittingToDescription.Count == 0)
             {
                 Reply("No Files found fitting to this description.");
                 Reply("Usage /gh_load <ghost id> <Part of the Filename>. E.g. /gh_load 17 playerABC_01");
                 return;
             }
-            else if (FilesFittingToDiscreption.Count > 1)
+            else if (FilesFittingToDescription.Count > 1)
             {
                 Reply("Too many Files found fitting to this description. Be more specific to only match one file.");
                 Reply("Usage /gh_load <ghost id> <Part of the Filename>. E.g. /gh_load 17 playerABC-001");
                 return;
             }
-            else
-            {
-                // Set GhostRecords Counter to 0
-                target.GhostPlaying = false;
-                foreach (AssettoServer.Server.Ai.AiState y in target._aiStates)
-                    if(y.LastSequenceID != 0)
-                        y.TeleportGhostTo(0);
 
-                string AbsolutePathToFile = FilesFittingToDiscreption[0];
+            _LoadGhost(target, FilesFittingToDescription[0]);
+            Reply($"Loaded in {FilesFittingToDescription[0]}");
 
-                target.DecodeAndLoadGhostFile(AbsolutePathToFile);
-                target.DecodeAndLoadGhostMetaFile(AbsolutePathToFile.Replace(".ghost", ".meta"));
-                AbsolutePathToFile = Path.GetFileName(AbsolutePathToFile);
-                if (AbsolutePathToFile.EndsWith(".ghost"))
-                    AbsolutePathToFile = AbsolutePathToFile.Replace(".ghost", "");
-                target.ReadInGhostFile = AbsolutePathToFile;
-                target.GhostPlaying = true;
+        }
 
-            }
+        public static void _LoadGhost(EntryCar target, string AbsolutePathToFile)
+        {
+            // Set GhostRecords Counter to 0
+            target.GhostPlaying = false;
+            foreach (AssettoServer.Server.Ai.AiState y in target._aiStates)
+                if (y.LastSequenceID != 0)
+                    y.TeleportGhostTo(0);
 
+            target.DecodeAndLoadGhostFile(AbsolutePathToFile);
+            target.DecodeAndLoadGhostMetaFile(AbsolutePathToFile.Replace(".ghost", ".meta"));
+            AbsolutePathToFile = Path.GetFileName(AbsolutePathToFile);
+            if (AbsolutePathToFile.EndsWith(".ghost"))
+                AbsolutePathToFile = AbsolutePathToFile.Replace(".ghost", "");
+            target.ReadInGhostFile = AbsolutePathToFile;
+            target.GhostPlaying = true;
+            target.GhostHidden = false;
         }
 
         [Command("gh_play")]
         public void GhostPlay(int GhostSessionID)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -333,7 +307,7 @@ namespace GhostManagerPlugin
         [Command("gh_pause")]
         public void GhostPause(int GhostSessionID)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -350,7 +324,7 @@ namespace GhostManagerPlugin
         [Command("gh_step")]
         public void GhostStepp(int GhostSessionID, int Steps)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -371,7 +345,7 @@ namespace GhostManagerPlugin
         [Command("gh_set")]
         public void GhostSet(int GhostSessionID, string Type, int Value)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -389,7 +363,7 @@ namespace GhostManagerPlugin
                     Reply($"Start value needs to be inbetween 0 and the end value {target.GhostEnd}.");
                     return;
                 }
-                if(Value > target.GhostLoop)
+                if (Value > target.GhostLoop)
                 {
                     Reply($"Start value was bigger than loop value and therefore the loop value (before:{target.GhostLoop}) was also set to the start value {Value}");
                     target.GhostLoop = Value;
@@ -403,12 +377,12 @@ namespace GhostManagerPlugin
                     Reply($"Loop value needs to be inbetween 0 and end value {target.GhostEnd}.");
                     return;
                 }
-                if(Value < target.GhostStart)
+                if (Value < target.GhostStart)
                 {
                     Reply($"Loop value was smaller than start value and therefore the start value (before: {target.GhostStart}) was also set to the loop value {Value}");
                     target.GhostStart = Value;
                 }
-            
+
                 target.GhostLoop = Value;
             }
             else if (Type.ToLower() == "end")
@@ -456,14 +430,14 @@ namespace GhostManagerPlugin
         [Command("gh_show_files")]
         public void GhostShowRecordFiles()
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
                 return;
             }
             DirectoryInfo directory = new DirectoryInfo(GhostManagerPlugin.GhostBasePath);
-            foreach (FileInfo file in directory.GetFiles()) 
+            foreach (FileInfo file in directory.GetFiles())
             {
                 if (!file.Name.Contains(".ghost"))
                     continue;
@@ -492,16 +466,16 @@ namespace GhostManagerPlugin
                 if (!x.Contains("README.md"))
                     continue;
 
-                ReadmeText = File.ReadAllText(x);                
+                ReadmeText = File.ReadAllText(x);
             }
-            if(ReadmeText.Length == 0)
+            if (ReadmeText.Length == 0)
             {
                 Reply("README.md not loaded in or empty.\n");
                 return;
             }
 
             var Splittedtxt = ReadmeText.Split("\n");
-            foreach(string x in Splittedtxt)
+            foreach (string x in Splittedtxt)
                 Reply(x);
         }
 
@@ -509,7 +483,7 @@ namespace GhostManagerPlugin
         [Command("gh_loopmode")]
         public void GhostLoopOnlyMode(int GhostSessionID, string Mode)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -539,7 +513,7 @@ namespace GhostManagerPlugin
         [Command("gh_hide")]
         public void GhostHide(int GhostSessionID)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -566,7 +540,7 @@ namespace GhostManagerPlugin
         [Command("gh_setcluster")]
         public void GhostSetCluster(int GhostSessionID, string ClusterName)
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -584,62 +558,12 @@ namespace GhostManagerPlugin
 
 
         // Will sync every ghost up to the given Ghost. This will make all other ghost recalculate their
-        // current time so that their time +/- offset matches that of the given ghost
+        // current time so that their time +/- offset matches
         // Pretty much only useful if you have multiple ghosts with the same ghostfile running but set an offset for each 
-        /*
-        [Command("gh_sync_by")]
-        public void GhostSyncBy(int GhostSessionID)
-        {
-            if (!Context.Client.IsAdministrator)
-            {
-                Reply("Command requires admin privileges.");
-                Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
-                return;
-            }
-
-            EntryCar target = FindGhost(GhostSessionID);
-            if (target == null)
-                return;
-
-            Dictionary<string, List<EntryCar>> GroupedByCluster = new Dictionary<string, List<EntryCar>>();
-            foreach (EntryCar car in GhostManagerPlugin._entryCarManager.EntryCars)
-            {
-                List<EntryCar> FoundCluster;
-                if (!GroupedByCluster.TryGetValue(car.GhostCluster, out FoundCluster))
-                {
-                    FoundCluster = new List<EntryCar>();
-                    GroupedByCluster.Add(car.GhostCluster, FoundCluster);
-                }
-                FoundCluster.Add(car);
-            }
-
-            foreach (string Cluster in GroupedByCluster.Keys)
-            {
-
-                // needs rework once overbooking for ghosts is implemented
-                int CurrentZeroPoint = target._aiStates[0].CurrentGhostRecord - target.GhostStart;
-
-                foreach (EntryCar car in GhostManagerPlugin._entryCarManager.EntryCars)
-                {
-                    if (car.SessionId == target.SessionId)
-                        continue;
-                    if (car.AiControlled && car.SessionId != null && car.ReadInGhostFile == target.ReadInGhostFile)
-                    {
-                        int RelativeOffset = car.GhostOffset - target.GhostOffset;
-                        int Range = car.GhostEnd - car.GhostStart;
-                        foreach (AiState state in car._aiStates)
-                        {
-                            state.TeleportGhostTo((car.GhostStart + CurrentZeroPoint + RelativeOffset) % Range);
-                        }
-                    }
-                }
-            }
-        }*/
-
         [Command("gh_sync")]
         public void GhostSyncAll()
         {
-            if (!Context.Client.IsAdministrator)
+            if (GhostManagerPlugin.AdminRequired && !Context.Client.IsAdministrator)
             {
                 Reply("Command requires admin privileges.");
                 Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
@@ -648,7 +572,7 @@ namespace GhostManagerPlugin
 
             foreach (EntryCar car in GhostManagerPlugin._entryCarManager.EntryCars)
             {
-                if (car.AiControlled && car.SessionId != null)
+                if (car.AiControlled && car.SessionId != null && car.ReadInGhostFile != null && car.ReadInGhostFile.Length > 0)
                 {
                     int Range = car.GhostEnd - car.GhostStart;
                     foreach (AiState state in car._aiStates)
@@ -659,6 +583,46 @@ namespace GhostManagerPlugin
             }
         }
 
+        [Command("gh_toggleAdminRequirements")]
+        public void toggleAdminRequirements()
+        {
+            if(GhostManagerPlugin.AdminRequired) 
+            {
+                if (!Context.Client.IsAdministrator)
+                {
+                    Reply("Command requires admin privileges.");
+                    Log.Information($"[GhostManagerPlugin]{Context.Client.Name} tried using the Command '{Context.Command.Name}' without enough privileges.");
+                    return;
+                }
+
+                GhostManagerPlugin.AdminRequired = false;
+                Reply("Admin Requirements have been turned off!");
+                Reply("This can enable bad actors to record unlimited amount of ghosts to your server or change current Ghost meta files without your consent.");
+                Reply("Only allow people you trust on this server and have backups of your ghost/meta files");
+                Log.Information($"[GhostManagerPlugin]Player {Context.Client.Name} disable AdminRequirements for this session.");
+            }
+            else
+            {
+                GhostManagerPlugin.AdminRequired = true;
+                Reply("Admin Requirements have been turned back on");
+                Log.Information($"[GhostManagerPlugin]Player {Context.Client.Name} enabled AdminRequirements for this session.");
+            }
+        }
+
+        [Command("gh_toggleQuickCommands")]
+        public void toggleQuickCommands()
+        {
+            if(GhostManagerPlugin.QuickCommandsEnabled)
+            {
+                GhostManagerPlugin.QuickCommandsEnabled = false;
+                Reply("Quick Commands have been disabled for this session.");
+            }
+            else 
+            {
+                GhostManagerPlugin.QuickCommandsEnabled = true;
+                Reply("Quick Commands have been enabled for this session.");
+            }
+        }
 
         /// <summary>Replaces characters in <c>text</c> that are not allowed in 
         /// file names with the specified replacement character.</summary>

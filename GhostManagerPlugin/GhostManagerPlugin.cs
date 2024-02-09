@@ -11,13 +11,18 @@ namespace GhostManagerPlugin
     {
         internal static ACServerConfiguration _configuration;
         internal static EntryCarManager _entryCarManager;
+        internal static SessionManager _sessionManager;
         internal static string GhostBasePath;
-        public GhostManagerPlugin(IHostApplicationLifetime applicationLifetime, ACServerConfiguration configuration, EntryCarManager entryCarManager) : base(applicationLifetime)
+        public static bool AdminRequired = true;
+        public static bool QuickCommandsEnabled = true;
+        private readonly List<EntryCarGhostExtended> ExtendedGhostCars = new();
+        public GhostManagerPlugin(IHostApplicationLifetime applicationLifetime, ACServerConfiguration configuration, EntryCarManager entryCarManager, SessionManager sessionManager) : base(applicationLifetime)
         {
-            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin V0.3 is starting");
+            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin V0.3.1 is starting");
 
             _configuration = configuration;
             _entryCarManager = entryCarManager;
+            _sessionManager = sessionManager;
 
             string contentPath = "content";
             const string contentPathCMWorkaround = "content~tmp";
@@ -39,7 +44,7 @@ namespace GhostManagerPlugin
             {
                 Directory.CreateDirectory(GhostBasePath);
             }
-            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin V0.3 constructed.");
+            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin V0.3.1 constructed.");
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -49,11 +54,14 @@ namespace GhostManagerPlugin
             int aiCount = 0;
             foreach (var entryCar in _entryCarManager.EntryCars)
             {
+
+                ExtendedGhostCars.Add(new EntryCarGhostExtended(entryCar, _entryCarManager, _sessionManager));
+
                 if (entryCar.AiControlled)
-                    aiCount++;
+                    aiCount++;                    
             }
 
-            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin plugin V0.3 initialized for {aiCount} Ghosts");
+            Log.Debug($"[GhostManagerPlugin] GhostManagerPlugin plugin V0.3.1 initialized for {aiCount} Ghosts");
             return Task.CompletedTask;
         }
     }
